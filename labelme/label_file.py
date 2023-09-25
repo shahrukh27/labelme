@@ -5,7 +5,8 @@ import json
 import os.path as osp
 
 import PIL.Image
-
+from skimage.io import imsave
+from skimage.draw import polygon2mask
 from labelme import __version__
 from labelme.logger import logger
 from labelme import PY2
@@ -151,6 +152,26 @@ class LabelFile(object):
             imageWidth = img_arr.shape[1]
         return imageHeight, imageWidth
 
+    def save_mask(
+        self,
+        filename,
+        data
+    ):
+
+        masks = {}
+
+        for polygon_num in range(len(data["shapes"])):
+            coordinates = [[y, x] for [x, y] in data["shapes"][polygon_num]["points"]]
+            if data["shapes"][polygon_num]["label"] in masks.keys():
+                masks[data["shapes"][polygon_num]["label"]] += polygon2mask(
+                    (data["imageHeight"], data["imageWidth"]), coordinates)
+            else:
+                masks[data["shapes"][polygon_num]["label"]] = polygon2mask(
+                    (data["imageHeight"], data["imageWidth"]), coordinates)
+
+        for label in masks:
+            imsave(osp.join(osp.dirname(filename), "mask_" + label + "_" + data["imagePath"]), masks[label])
+
     def save(
         self,
         filename,
@@ -186,6 +207,7 @@ class LabelFile(object):
         try:
             with open(filename, "w") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            self.save_mask(filename, data)
             self.filename = filename
         except Exception as e:
             raise LabelFileError(e)
